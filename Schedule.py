@@ -1,5 +1,5 @@
 from typing import Tuple, Union  # Кортеж, объединение типов
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, date
 
 from pytz import timezone, utc  # Работаем с временнОй зоной и UTC
 
@@ -19,13 +19,14 @@ class Schedule:
     """Расписание торгов"""
     market_timezone = timezone('Europe/Moscow')  # ВременнАя зона работы биржи
 
-    def __init__(self, trade_sessions, delta):
+    def __init__(self, trade_sessions, delta, ignore_dates):
         """
         :param list[Session] trade_sessions: Список торговых сессий
         :param timedelta delta: Задержка, чтобы гарантированно получить сформированный бар
         """
         self.trade_sessions = sorted(trade_sessions, key=lambda session: session.time_begin)  # Список торговых сессий сортируем по возрастанию времени начала сессии
         self.delta = delta  # Задержка, чтобы гарантированно получить сформированный бар
+        self.ignore_dates = ignore_dates
 
     def trade_session(self, dt_market) -> Union[Session, None]:
         """Торговая сессия по дате и времени на бирже. None, если торги не идут
@@ -81,6 +82,9 @@ class Schedule:
         w_market = d_market.weekday()  # День недели даты на бирже
         if w_market in (5, 6):  # Если задан выходной день
             d_market += timedelta(7 - w_market)  # то будем ждать первой торговой сессии понедельника
+        if self.ignore_dates is not None and d_market in self.ignore_dates:     # дополнительные даты по которым торги не идут
+            d_market += timedelta(1)  # то будем перовой следующей возможной сессии
+
         dt_next_session = datetime(d_market.year, d_market.month, d_market.day, session.time_begin.hour, session.time_begin.minute, session.time_begin.second)
         return dt_next_session - dt_market
 
@@ -230,11 +234,14 @@ class MOEXFutures(Schedule):
 class MOEXFuturesOI(Schedule):
     """Расписание торгов Московской Биржи: Времена формирования ОИ на срочном рыноке"""
     def __init__(self):
-        super(MOEXFuturesOI, self).__init__([
-            Session(time(10, 5, 0), time(13, 59, 59)),  # Основная торговая сессия (Дневной расчетный период)
-            Session(time(14, 5, 0), time(18, 49, 59)),  # Основная торговая сессия (Вечерний расчетный период)
-            Session(time(19, 5, 0), time(23, 54, 59))  # Вечерняя дополнительная торговая сессия
-        ], timedelta(seconds=3))  # Задержка 3 секунды, чтобы гарантированно получить бар
+        super(MOEXFuturesOI, self).__init__(
+            [
+                Session(time(10, 5, 0), time(13, 59, 59)),  # Основная торговая сессия (Дневной расчетный период)
+                Session(time(14, 5, 0), time(18, 49, 59)),  # Основная торговая сессия (Вечерний расчетный период)
+                Session(time(19, 5, 0), time(23, 54, 59))   # Вечерняя дополнительная торговая сессия
+            ],
+            delta=timedelta(seconds=3),
+            ignore_dates=[date(2024, 11, 4)])
 
 
 if __name__ == '__main__':  # Точка входа при запуске этого скрипта
