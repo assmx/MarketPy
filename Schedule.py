@@ -19,7 +19,7 @@ class Schedule:
     """Расписание торгов"""
     market_timezone = timezone('Europe/Moscow')  # ВременнАя зона работы биржи
 
-    def __init__(self, trade_sessions, delta, ignore_dates):
+    def __init__(self, trade_sessions, delta, ignore_dates=None):
         """
         :param list[Session] trade_sessions: Список торговых сессий
         :param timedelta delta: Задержка, чтобы гарантированно получить сформированный бар
